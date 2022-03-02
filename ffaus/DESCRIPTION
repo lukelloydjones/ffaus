@@ -1,0 +1,15 @@
+Package: ffaus
+Title: Functional Flows Australia
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Luke",
+           family = "Lloyd-Jones",
+           role = c("aut", "cre"),
+           email = "luke.lloyd-jones@csiro.au")
+Description: Summarise daily stream flow data using a customised  functional flows (FF) approach Yarnell et al. (2015) to the Australian context. FF focuses on retaining specific process-based components of the flow hydrograph, or functional flows, rather than attempting to mimic the full natural flow regime. Key functional components include magnitude, timing and duration of the wet-season initiation flows, wet-season base flows, peak magnitude flows, recession flows, dry-season low flows, and inter- annual variability.
+Imports: dplyr, lubridate, assertthat, metR, zoo, stats, utils, sm, graphics, grDevices, rstudioapi, tibble, plyr, magrittr
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
