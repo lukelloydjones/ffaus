@@ -72,7 +72,7 @@ functional_flows_aus.pdf
     details.
 
 /func_flow_r_aus.Rproj
-  RShiny project file, which should help with setting up the environment and allow
+  R project file, which should help with setting up the environment and allow
   for a quick try of the code.
 
 flowmer_ff_all_gauges.R
