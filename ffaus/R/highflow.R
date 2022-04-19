@@ -189,7 +189,7 @@ calcWhippleHighFlow <- function(flow_matrix, whipple_exceed_thresh = 0.95)
   # Call the Whipple prep functions. This might need rearranging for Aus context
   flw_whip    <- flow_matrix[, c("Date", "Flow")]
   colnames(flw_whip) <- c("dt", "flw")
-  flw_whip$dt <- format(flw_whip$dt, "%m-%d-%Y")
+  flw_whip$dt <- format.Date(flw_whip$dt, "%m-%d-%Y")
   flow_preped <- utils_flowformat_2(flw_whip, 7)
 
   # Compute the flood events

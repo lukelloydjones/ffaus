@@ -2,10 +2,10 @@
 # Main function for hydrological metrics computation
 # Author (that's a strong word): Luke Lloyd-Jones
 # Date started: 26/02/2021
-# Date updated: 31/05/2021
+# Date updated: 19/04/2022
 # =====================================================
 # Updates log
-#
+# 19/04/2022 - Updated to make plotting more robust
 
 
 #' Global hydrological metrics calculation and exceedance summary
@@ -33,18 +33,27 @@
 #' @param min_dry_season_flow_percent Percentile of flow taken to be the threshold for dry-season start. Percentile is computed over
 #'                                    flow values from the final peak to the end of the water-year.
 #' @param init_broad_sigma the standard deviation of the Gaussian kernel used to smooth intra-annual flow for detection of the flow initiation. A key parameter to adjust if
-#'flow initiation start dates are not being detected correctly. Default is 15 so make small adjustments first either side.
+#' flow initiation start dates are not being detected correctly. Default is 15 so make small adjustments first either side.
 #' @param last_date_cutoff_initiation the last date that flow initiation can begin. Can be later in water year for flashy water systems.
 #' @param wet_peak_detect_perc the proportion of the maximum yearly (water-year) flow that the return to wet peak must be to be considered the peak that initiates the wet period.
 #' @param whipple_exceed_thresh the exceedance percentile threshold for large flood flows.
 #' @param recess_init_timing_cutoff earliest accepted date of water year in which the last peak before the recession can occur.
 #' @param recess_peak_filter_percentage the proportion of the flow range (Qmax - Qmin) that the final peak must exceed
 #' to be considered the final peak for detection of recession start. A key parameter to adjust if recession start dates are not as expected.
+#' @param plot_width Plot width in inches used by 'png' function to write out plots at 300 dpi.
+#' Suggest more width than height for more definition on the x-axis year scale.
+#' @param plot_height Plot height in inches used by 'png' function to write out plots at 300 dpi.
+#' @param mfrow_rw Number of rows to set in the diagnostic plots to capture all years for 
+#' which metrics are being estimated. Suggest more rows than columns but depends on
+#' circumstance. Suggest mfrow_rw * mfrow_cl > No. years studied.
+#' @param mfrow_cl Number of rows to set in the diagnostic plots to capture all years.
 #'
 #' @return A list with one data frame (at this stage) named FFmetrics
 #' * The data frame FFmetrics includes the exceedance metrics and the functional
 #'   flow metrics in the rows and the columns are the summary value
-#'   for each water year.
+#'   for each water year. If the diagnostic plot option in used then 
+#'   diagnostic plots are written to specified directory determined
+#'   by 'plot_out_base'.
 getFFMetrics <- function(flow_matrix,
                          class_number = 3,
                          do_plot = 0,
@@ -60,7 +69,11 @@ getFFMetrics <- function(flow_matrix,
                          wet_peak_detect_perc = 0.3,
                          whipple_exceed_thresh  = 0.95,
                          recess_init_timing_cutoff = 80,
-                         recess_peak_filter_percentage = 0.5)
+                         recess_peak_filter_percentage = 0.5,
+                         plot_width  = 6,
+                         plot_height = 3,
+                         mfrow_rw    = 2,
+                         mfrow_cl    = 2)
 {
   # ------------------------------------
   # Default class number is 3
@@ -72,22 +85,36 @@ getFFMetrics <- function(flow_matrix,
 
   #(is.null(plot_out_base))
 
-  # This is fine. Might add in some of the other annual requested outputs to this function
-  all_year_out <- calcAllYear(flow_matrix, do_plot = 1, user_q75_thresh = user_q75_thresh, user_q90_thresh = user_q90_thresh)
-
+  # This is fine. Might add in some of the other 
+  # annual requested outputs to this function
   if (!is.null(plot_out_base))
   {
     plot_type <- "exceedances"
     file      <- paste0(plot_out_base, "_", plot_type, ".png")
-    rstudioapi::savePlotAsImage(file, format = c("png"), 1400, 800)
+    png(filename = file,
+        bg = "white", width =  25, height = 16, 
+        units = 'in', res = 300)
+      par(mfrow = c(5, 10))
+      all_year_out <- calcAllYear(flow_matrix, do_plot = do_plot, 
+                                  user_q75_thresh = user_q75_thresh, 
+                                  user_q90_thresh = user_q90_thresh)
+    dev.off()
+  } else {
+    all_year_out <- calcAllYear(flow_matrix, do_plot = do_plot, 
+                                user_q75_thresh = user_q75_thresh, 
+                                user_q90_thresh = user_q90_thresh)
   }
+
 
   out_all_year <- rbind(round(all_year_out$average_annual_flows, 3),
                         round(all_year_out$standard_deviations, 3),
                         round(all_year_out$coefficient_variations, 3),
                         round(all_year_out$mags, 3),
-                        round(all_year_out$tims, 0), all_year_out$freqs, all_year_out$durs,
-                        all_year_out$mags_long_evnt, all_year_out$tims_init_long_evnt, all_year_out$seas_init_long_evnt,
+                        round(all_year_out$tims, 0), 
+                        all_year_out$freqs, all_year_out$durs,
+                        all_year_out$mags_long_evnt, 
+                        all_year_out$tims_init_long_evnt, 
+                        all_year_out$seas_init_long_evnt,
                         all_year_out$durs_long_evnt)
 
   out_all_year$All_Years_Avg <- c(round(c(mean(flow_matrix$Flow, na.rm = T), stats::sd(flow_matrix$Flow, na.rm = T),
@@ -97,7 +124,9 @@ getFFMetrics <- function(flow_matrix,
                                         floor(rowMeans(all_year_out$durs, na.rm = T)),
                                         floor(rowMeans(all_year_out$mags_long_evnt, na.rm = T)),
                                         floor(rowMeans(all_year_out$tims_init_long_evnt, na.rm = T))), 3),
-                                        as.character(unlist(apply(all_year_out$seas_init_long_evnt, 1, function(x) {names(which(table(as.character(x)) == max(table(as.character(x)))))[1]}))),
+                                        as.character(unlist(apply(all_year_out$seas_init_long_evnt, 1, 
+                                        function(x) {names(which(table(as.character(x)) == 
+                                                                   max(table(as.character(x)))))[1]}))),
                                         round(floor(rowMeans(all_year_out$durs_long_evnt, na.rm = T)), 3))
 
   rownames(out_all_year)[seq(1, 3)] <- c("Avg_Ann", "SD_Ann", "CV_Ann")
@@ -109,34 +138,56 @@ getFFMetrics <- function(flow_matrix,
   }
 
   # Characterise the dry season. This is mostly winter in Aus.
-  dry_season_start_dates <- calcStartOfdry_season(flow_matrix = flow_matrix,
-                                                  class_number = class_number,
-                                                  max_peak_flow_date = dry_max_peak_flow_date,
-                                                  sensitivity = dry_sensitivity,
-                                                  min_dry_season_flow_percent = min_dry_season_flow_percent,
-                                                  do_plot = do_plot)
-
   if (!is.null(plot_out_base))
   {
     plot_type <- "dry_season_start_dates"
     file      <- paste0(plot_out_base, "_", plot_type, ".png")
-    rstudioapi::savePlotAsImage(file, format = c("png"), 1400, 800)
+    png(filename = file,
+        bg = "white", width =  25, height = 16, 
+        units = 'in', res = 300)
+      par(mfrow = c(5, 10))
+      dry_season_start_dates <- calcStartOfdry_season(flow_matrix = flow_matrix,
+                                                      class_number = class_number,
+                                                      max_peak_flow_date = dry_max_peak_flow_date,
+                                                      sensitivity = dry_sensitivity,
+                                                      min_dry_season_flow_percent = min_dry_season_flow_percent,
+                                                      do_plot = do_plot)
+     dev.off()
+  } else {
+    dry_season_start_dates <- calcStartOfdry_season(flow_matrix = flow_matrix,
+                                                    class_number = class_number,
+                                                    max_peak_flow_date = dry_max_peak_flow_date,
+                                                    sensitivity = dry_sensitivity,
+                                                    min_dry_season_flow_percent = min_dry_season_flow_percent,
+                                                    do_plot = do_plot)
   }
-
+  
   # I'm really not sure there is an initiation flows flush as FF US defines it but lets look and see what the code tells us
-  initiation_flows_out <- calcFlowInitiationFlushTimingsDurations(flow_matrix = flow_matrix,
-                                                                  dry_season_start_dates = dry_season_start_dates,
-                                                                  class_number = class_number,
-                                                                  last_date_cutoff_flush = last_date_cutoff_initiation,
-                                                                  peak_detect_perc = wet_peak_detect_perc,
-                                                                  broad_sigma = init_broad_sigma,
-                                                                  do_plot = do_plot)
-
   if (!is.null(plot_out_base))
   {
     plot_type <- "initiation_flows"
     file      <- paste0(plot_out_base, "_", plot_type, ".png")
-    rstudioapi::savePlotAsImage(file, format = c("png"), 1400, 800)
+    png(filename = file,
+        bg = "white", width =  25, height = 16, 
+        units = 'in', res = 300)
+      par(mfrow = c(5, 10))
+      initiation_flows_out <- calcFlowInitiationFlushTimingsDurations(flow_matrix = flow_matrix,
+                                                                      dry_season_start_dates = dry_season_start_dates,
+                                                                      class_number = class_number,
+                                                                      last_date_cutoff_flush = last_date_cutoff_initiation,
+                                                                      peak_detect_perc = wet_peak_detect_perc,
+                                                                      broad_sigma = init_broad_sigma,
+                                                                      do_plot = do_plot)
+    dev.off()
+
+  } else {
+    initiation_flows_out <- calcFlowInitiationFlushTimingsDurations(flow_matrix = flow_matrix,
+                                                                    dry_season_start_dates = dry_season_start_dates,
+                                                                    class_number = class_number,
+                                                                    last_date_cutoff_flush = last_date_cutoff_initiation,
+                                                                    peak_detect_perc = wet_peak_detect_perc,
+                                                                    broad_sigma = init_broad_sigma,
+                                                                    do_plot = do_plot)
   }
 
   # This is not good without initiation_flows_out$wet_dates.
@@ -149,36 +200,71 @@ getFFMetrics <- function(flow_matrix,
   high_flow_out   <- calcHighflowAnnual(flow_matrix = flow_matrix, do_plot = do_plot)
 
   # This could get ugly. The recession woohoo.
-  recession_tim_mag <- calcRecessionTimingMagnitude(flow_matrix = flow_matrix,
-                                                    class_number = class_number,
-                                                    dry_season_start_dates = dry_season_start_dates,
-                                                    timing_cutoff =  recess_init_timing_cutoff,
-                                                    peak_filter_percentage = recess_peak_filter_percentage,
-                                                    do_plot = 1)
-  recession_dur     <- calcRecessionDuration(recession_timings = recession_tim_mag$timings,     dry_season_start_dates =    dry_season_start_dates)
-  recession_roc     <- calcRecessionRoc(flow_matrix = flow_matrix,
-                                        recession_timings = recession_tim_mag$timings,
-                                        dry_season_start_dates = dry_season_start_dates)
-
   if (!is.null(plot_out_base))
   {
     plot_type <- "recession_timing_duration"
     file      <- paste0(plot_out_base, "_", plot_type, ".png")
-    rstudioapi::savePlotAsImage(file, format = c("png"), 1400, 800)
+    png(filename = file,
+        bg = "white", width =  25, height = 16, 
+        units = 'in', res = 300)
+      par(mfrow = c(5, 10))
+      recession_tim_mag <- calcRecessionTimingMagnitude(flow_matrix = flow_matrix,
+                                                        class_number = class_number,
+                                                        dry_season_start_dates = dry_season_start_dates,
+                                                        timing_cutoff =  recess_init_timing_cutoff,
+                                                        peak_filter_percentage = recess_peak_filter_percentage,
+                                                        do_plot = do_plot)
+      recession_dur     <- calcRecessionDuration(recession_timings = 
+                                                 recession_tim_mag$timings,     
+                                                 dry_season_start_dates = 
+                                                 dry_season_start_dates)
+      recession_roc     <- calcRecessionRoc(flow_matrix = flow_matrix,
+                                            recession_timings = 
+                                            recession_tim_mag$timings,
+                                            dry_season_start_dates = 
+                                            dry_season_start_dates)
+      dev.off()
+  } else {
+    recession_tim_mag <- calcRecessionTimingMagnitude(flow_matrix = flow_matrix,
+                                                      class_number = class_number,
+                                                      dry_season_start_dates = dry_season_start_dates,
+                                                      timing_cutoff =  recess_init_timing_cutoff,
+                                                      peak_filter_percentage = recess_peak_filter_percentage,
+                                                      do_plot = do_plot)
+    recession_dur     <- calcRecessionDuration(recession_timings = 
+                                                 recession_tim_mag$timings,     
+                                               dry_season_start_dates = 
+                                                 dry_season_start_dates)
+    recession_roc     <- calcRecessionRoc(flow_matrix = flow_matrix,
+                                          recession_timings = 
+                                            recession_tim_mag$timings,
+                                          dry_season_start_dates = 
+                                            dry_season_start_dates)
+    
   }
 
-  # Wet season base flows
-  wet_season_bf    <- calcWetSeasonBaseflow(flow_matrix = flow_matrix,
-                                            wet_timings = initiation_flows_out$wet_dates,
-                                            recession_timings = recession_tim_mag$timings,
-                                            dry_season_start_dates = dry_season_start_dates,
-                                            do_plot = 1)
 
+  # Wet season base flows
   if (!is.null(plot_out_base))
   {
     plot_type <- "wet_season_bf"
     file      <- paste0(plot_out_base, "_", plot_type, ".png")
-    rstudioapi::savePlotAsImage(file, format = c("png"), 1400, 800)
+    png(filename = file,
+        bg = "white", width =  25, height = 16, 
+        units = 'in', res = 300)
+      par(mfrow = c(5, 10))
+      wet_season_bf    <- calcWetSeasonBaseflow(flow_matrix = flow_matrix,
+                                                wet_timings = initiation_flows_out$wet_dates,
+                                                recession_timings = recession_tim_mag$timings,
+                                                dry_season_start_dates = dry_season_start_dates,
+                                                do_plot = do_plot)
+    dev.off()
+  } else {
+    wet_season_bf    <- calcWetSeasonBaseflow(flow_matrix = flow_matrix,
+                                              wet_timings = initiation_flows_out$wet_dates,
+                                              recession_timings = recession_tim_mag$timings,
+                                              dry_season_start_dates = dry_season_start_dates,
+                                              do_plot = do_plot)
   }
 
   # Whipple extras
